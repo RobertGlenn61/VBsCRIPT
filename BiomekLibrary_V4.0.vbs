@@ -1,10 +1,9 @@
-
 ' TODO 
 ' Do not change the value of input parameters
 ' Add Comments, headers, etc
 ' Create Functions only - return "error" if the function fails
 ' Prevent Write File writing during validation
-' * Create arrays using lists, especially for worklists where the number of elements
+' Create arrays using lists, especially for worklists where the number of elements
 ' is not always 96 elements
 
 ''Dim fxControl: Set fxControl = CreateObject("fxControlLib.FXControl")
@@ -403,7 +402,7 @@ Function GetAlphaNumericID(id, totalWells)
    resp = "GetAlphaNumericId for " & totalWells & " wells"
    resp = resp & vbCrLf & "row = " & row & "   col = "  & col 
    resp = resp & vbCrLf & "Well id: " & id & " = " & pos
-'''   resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+'  resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
    GetAlphaNumericID = pos
 
@@ -482,7 +481,7 @@ Function GetNumericID( myWell, totalWells )
    wellOK = vbFalse
    pos = -1
    well = UCase(well)      
-   'resp = World.Globals.PauseGenerator.BtnPromptUser(well, Array("OK"), "OK")
+ ' resp = World.Globals.PauseGenerator.BtnPromptUser(well, Array("OK"), "OK")
 
 If Len(well)>=2 Then
    If Asc(Mid(well,1,1)) >= Asc("A") Then
@@ -504,7 +503,7 @@ End If
 ' DEBUG
  resp = "GetNumericId for " & totalWells & " wells"
  resp = resp & vbCrLf & "WELL: " & well & "  POS: " & pos
-''' resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+'resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
    GetNumericID = CInt(pos)
 End Function
@@ -527,14 +526,14 @@ Function GetWellCount(barcode)
       Set lw = Positions(alp).Labware
       nWells = lw.Class.WellsX * lw.Class.WellsY
       GetWellCount = nWells
-      resp = "ALP Found = " & alp & vbCrLf
-      resp = resp & "n wells = " & nWells & vbCrLf
-      resp = resp & GetWellCount
+      resp = "ALP Found = " & alp & "   n wells = " & nWells 
    Else
       GetWellCount = alp
       resp = "Error in GetWellCount: " & CStr(alp)
   End If
-
+  Call fileClass.WriteToDebugFile("null", Replace(resp,vbCrLf, vbTab))
+  
+  Err.Clear 
 ' DEBUG
 ' resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
@@ -575,12 +574,10 @@ header = wlArray(0)
 headerArray = Split(header, ",")
 
 	For ii = 0 to Ubound(headerArray)
-
-	If headerArray(ii) = "WaterWellPosition" Then
+	   If headerArray(ii) = "WaterWellPosition" Then
    		waterIdx = ii
-   		Exit For
-	End If
-
+         Exit For
+	   End If
 	Next
 
 	For ii = 1 to UBound(wlArray)
@@ -592,28 +589,22 @@ headerArray = Split(header, ",")
 			Select Case ii Mod 4
 
 				Case 0 
-
    				well = "D1"
 
 				Case 1
-
    				well = "A1"
 
 				Case 2
-
    				well = "B1"
 
 				Case 3 
-				
 				well = "C1"
 
 			End Select
 
  
 			line(waterIdx) = well
-
 			newLine = Join(line, ",")
-
 			wlData = wlData & newLine & vbCrLf
 
 		End If
@@ -622,7 +613,7 @@ headerArray = Split(header, ",")
 
 	data = header & vbCrLf & data
 
-Call Write(data,HGSC.Lims.Gen2.Data.Worklist,vbFalse, vbTrue)
+   Call Write(data,HGSC.Lims.Gen2.Data.Worklist,vbFalse, vbTrue)
 
 End Sub
 
@@ -638,8 +629,9 @@ End Sub
 Sub LogData(logFileName, data)
 Dim fso, logFile, fileName
 
-' Stop forward processing
-World.Globals.PauseGenerator.StallUntilETSIs 0 
+  On Error Resume Next
+  ' Stop forward processing
+  World.Globals.PauseGenerator.StallUntilETSIs 0 
 
    Set fso = CreateObject("Scripting.FileSystemObject")
 
@@ -661,8 +653,15 @@ World.Globals.PauseGenerator.StallUntilETSIs 0
 
    Set fso = Nothing
    
-   Call WriteToDebugFile("", data, vbFalse)
+  If Err.Number<>0 Then
+     Dim msg: msg = "Error in LogData: " & vbCrLf & Err.Description
+     Call World.Globals.PauseGenerator.BtnPromptUser(msg, Array("OK"), "OK")
+     Err.Clear
+  End If
 
+   
+   Call WriteToDebugFile("null", data, vbFalse)
+   
 End Sub
 '///////////////////////////////////////
 
@@ -721,11 +720,11 @@ End Sub
 ' ...file does not exist?
 ' Pass in the total wells?
 '////////////////////////////////////////////////////
-Function GetWellDataList(fileName, wellHeader, dataHeader, lwBarcode, lwHeader)
+Function GetWellDataList(fileName, wellHeader, dataHeader, lwBarcode, lwHeader, defaultTotalWells)
 Dim dataArray, myList, wellId, ii, wellClass
 Dim resp
 
-   On Error Resume Next
+  On Error Resume Next
 
    resp = "GetWellDataList: " & vbCrLf
    resp = resp & "File: " & fileName & vbCrLf 
@@ -733,16 +732,18 @@ Dim resp
    resp = resp & "Data Header: " & dataHeader & vbCrLf
    resp = resp & "Barcode: " & lwBarcode
    Call WriteToDebugFile("", resp, vbFalse)
-   'resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+'   Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
    Set wellClass = new Wells
-   dataArray = GetWellDataArray(fileName, wellHeader, dataHeader, lwBarcode, lwHeader)
+   dataArray = GetWellDataArray(fileName, wellHeader, dataHeader, lwBarcode, lwHeader, defaultTotalWells)
    If Not IsArray(dataArray) Then
       GetWellDataList = "Error in GetWellDataList: " & dataArray
-'      resp = World.Globals.PauseGenerator.BtnPromptUser(dataArray, Array("OK"), "OK")
+      Call WriteToDebugFile("", GetWellDataList, vbFalse)
+'      Call World.Globals.PauseGenerator.BtnPromptUser(dataArray, Array("OK"), "OK")
       Exit Function
    End If
  
+ ' Assemble the list
    myList = ""
    For ii=1 To UBound(dataArray)
       If dataArray(ii)<>"0" Then
@@ -755,15 +756,17 @@ Dim resp
       End If
    Next
 
-   If Err.Number>0 Then
+   If Err.Number<>0 Then
       GetWellDataList = "GetWellDataList error, file: " & fileName & vbCrLf & "Error= " & err.Description
+'      Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataList, Array("OK"), "OK")
       Err.Clear
       Exit Function
    Else
       GetWellDataList = myList
-   '   resp = World.Globals.PauseGenerator.BtnPromptUser("MyList="&myList, Array("OK"), "OK")
    End If
    
+   Call WriteToDebugFile("", GetWellDataList, vbFalse)
+'   Call World.Globals.PauseGenerator.BtnPromptUser("GetWellDataList:" & vbCrLf & GetWellDataList, Array("OK"), "OK")
 End Function
 
 '////////////////////////////////////////////////////
@@ -772,8 +775,12 @@ End Function
 ' wells in column wellHeader, return the data in 
 ' the associated cell in the dataHeader column
 ' Headers can be either an integer or a string
+'
+' Unless there's an error, GetWellDataArray returns an array 1..nWells
+' If there's no data, the value is "0"
 ' 
 ' TODO:
+' July 11, 2017 - Refactor, this can be cleaner
 ' What happens if 
 ' ...header is not in file?
 ' ...file does not exist?
@@ -800,14 +807,14 @@ Dim isLwMatch, numElements
    resp = resp & "Labware Barcode (optional): " & lwBarcode & vbCrLf
    resp = resp & "Labware Header (optional): " & lwHeader
 '   Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
-'   Call WriteToDebugFile("", resp, vbFalse)
+   Call WriteToDebugFile("", resp, vbFalse)
    
    Set wellClass = new Wells
    Set fso = CreateObject("Scripting.FileSystemObject")
    If NOT fso.FileExists(fileName) Then
       GetWellDataArray = "Error in GetWellDataArray, file does not exist: " & fileName
       Set fso = Nothing
-   '   resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+      Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
       Exit Function
    End If
 
@@ -816,8 +823,8 @@ Dim isLwMatch, numElements
       GetWellDataArray = "Error in GetWellDataArray, can't open file: " & fileName & vbCrLf & "Error= " & err.Description
       Err.Clear
       Set fso = Nothing
-      resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
-'      Call WriteToDebugFile("", GetWellDataArray, vbFalse)
+'      Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+      Call WriteToDebugFile("", GetWellDataArray, vbFalse)
       Exit Function
    End If
    
@@ -834,7 +841,7 @@ Dim isLwMatch, numElements
    End If
    If Not IsNumeric(totalWells) Then
       GetWellDataArray = "Error in GetWellDataArray, can't find totalWells in barcode " & lwBarcode & vbCrLf & "Error= " & totalWells
-   '   resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+'      Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
       Call WriteToDebugFile("", GetWellDataArray, vbFalse)
       Set fso = Nothing
       Exit Function
@@ -859,13 +866,13 @@ Dim isLwMatch, numElements
       Err.Clear
       Set fso = Nothing
       Call WriteToDebugFile("", GetWellDataArray, vbFalse)
-   '   resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+'      Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
       Exit Function
    End If
    If Len(line)<3 Then
       GetWellDataArray = "Error in GetWellDataArray, file does not contain header data: " & fileName
       Call WriteToDebugFile("", GetWellDataArray, vbFalse)
-      '   resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+'      Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
       Set fso = Nothing
       Exit Function
    End If
@@ -873,10 +880,7 @@ Dim isLwMatch, numElements
 ' Find the header indices
    wellIdx = GetHeaderIndex(line,wellHeader)
    dataIdx = GetHeaderIndex(line,dataHeader)
-   lwIdx = -1
-   If lwHeader<>"null" Then
-      lwIdx = GetHeaderIndex(line,lwHeader)
-   End If
+   lwIdx = GetHeaderIndex(line,lwHeader)
    numElements = UBound(Split(line, ","))
   
   ' Indices not found
@@ -885,7 +889,7 @@ Dim isLwMatch, numElements
       resp = resp & "while searching for well header '" & wellHeader & "' and data header '" & dataHeader & "'"     
       GetWellDataArray = resp
       Call WriteToDebugFile("", GetWellDataArray, vbFalse)
-   '   resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+'      Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
       Set fso = Nothing
       Exit Function
   End If
@@ -895,12 +899,12 @@ Do Until File.AtEndOfStream
    lineArray = Split(line, ",")
    
    ' DEBUG
-    resp = "LINE: " & line & vbCrLf & "Array Size: " & UBound(lineArray)
-    For ii=0 To UBound(lineArray)
-       resp = resp & vbCrLf & "Element " & CStr(ii) & " = " & lineArray(ii)
-    Next
+'    resp = "LINE: " & line & vbCrLf & "Array Size: " & UBound(lineArray)
+'    For ii=0 To UBound(lineArray)
+'       resp = resp & vbCrLf & "Element " & CStr(ii) & " = " & lineArray(ii)
+'    Next
 '    Call WriteToDebugFile("", resp, vbFalse)
-'    resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+'    Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
    ' Check optional match for labware barcode
    ' Option selected id lwIdx>=0
@@ -912,11 +916,13 @@ Do Until File.AtEndOfStream
          resp = resp & "The line from the worklist does not seem to match the expected rack barcode header" & vbCrLf
          resp = resp & "Line from file: " & line & vbCrLf & "Labware barcode header index = " & lwIdx
          Call WriteToDebugFile("", GetWellDataArray, vbFalse)
-      '   resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+'         Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
          Set fso = Nothing
          Exit Function
       Else
          isLwMatch = vbFalse
+         resp = "isLwMatch?" & vbCrLf & lineArray(lwIdx) & " ?=? " & lwBarcode
+'         Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
          If lineArray(lwIdx)=lwBarcode Then
             isLwMatch = vbTrue
          End If
@@ -925,7 +931,7 @@ Do Until File.AtEndOfStream
    Else
       isLwMatch = vbTrue
    End If
-   
+    
    If isLwMatch = vbTrue Then
 
       ' Well index may not be alpha-numeric
@@ -941,12 +947,13 @@ Do Until File.AtEndOfStream
          End If
          resp = "GetWellDataArray, numeric ID " & numericID & " > 0" & vbCrLf & line & vbCrLf
          resp = resp & "WELL: " & lineArray(wellIdx) & "  POS: " & numericID & "  Data " & dataArray(numericID)
-     ''    resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+'         Call WriteToDebugFile("", resp, vbFalse)
+'         Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
       Else
-         resp = "GetWellDataArray error, numeric ID " & numericID & " <= 0" & vbCrLf
-         resp = resp & "WELL: " & lineArray(wellIdx) & "  does not translate to numeric id" 
+         GetWellDataArray = "GetWellDataArray error, numeric ID " & numericID & " <= 0" & vbCrLf
+         GetWellDataArray = GetWellDataArray & "WELL: " & lineArray(wellIdx) & "  does not translate to numeric id" 
          Call WriteToDebugFile("", GetWellDataArray, vbFalse)
-      '   resp = World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
+'         Call World.Globals.PauseGenerator.BtnPromptUser(GetWellDataArray, Array("OK"), "OK")
          Set fso = Nothing
          Exit Function
       End If
@@ -955,24 +962,24 @@ Do Until File.AtEndOfStream
 
    ' DEBUG
    ' This fails if numericID<0
-'     resp = "GetWellDataArray" & vbCrLf
-'     resp = resp & "WELL: " & lineArray(wellIdx) & "  POS: " & numericID & "  Data " & dataArray(numericID)
-'     resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+     resp = "GetWellDataArray" & vbCrLf
+     resp = resp & "WELL: " & lineArray(wellIdx) & "  POS: " & numericID & "  Data " & dataArray(numericID)
+'     Call  World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
      
 Loop
 Set fso = nothing	
 GetWellDataArray = dataArray
-If Err.Number<>0 Then
+If Err.Number>0 Then
    GetWellDataArray = "GetWellDataArray error, 'GetWellDataArray = dataArray' file: " & vbCrLf & "Error= " & err.Description
-   Call WriteToDebugFile("", GetWellDataArray, vbFalse)
+   Call WriteToDebugFile("null", GetWellDataArray, vbFalse)
    Err.Clear
 Else
-   resp = "GetWellDataArray UBound=" &  UBound(dataArray) & vbTab & "VALUES:" 
+   resp = "GetWellDataArray UBound=" &  UBound(dataArray) & vbTab & "VALUES:" & vbCrLf
    For ii=1 To UBound(dataArray)
-      resp = resp & "[" & CStr(ii) & "]=" & dataArray(ii) & vbTab
+      resp = resp & "[" & CStr(ii) & "]=" & dataArray(ii) & vbCrLf
    Next
-   Call WriteToDebugFile("", resp, vbFalse)
-'  resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+   Call WriteToDebugFile("null", Replace(resp, cbCrLf, vbTab), vbFalse)
+'   Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 End If
 
 End Function
@@ -1184,7 +1191,6 @@ Dim tso, fso, worklistName,ii
 '  resp = resp & "Index of extension is " & CStr(ii)
 '  resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
-
    Set fso = CreateObject("Scripting.FileSystemObject")
 
    If fso.FileExists(worklistName) Then
@@ -1287,35 +1293,10 @@ text = wlArray(0)   ' vbCrLf added later...
 
 ' Sort the header indices
 ' assume for now that the headers are valid
-If isNumeric(wellHeader) then
-   idxWell = wellHeader
-Else
-   ii=0
-   idxWell = -1
-   For Each header in Split(text,",")
-      If LCase(header) = LCase(wellHeader) Then
-         idxWell = ii
-         Exit For
-      End If
-      ii = ii + 1
-   Next
-End If
+idxWell = GetHeaderIndex(wlArray(0),wellHeader)
+idxBC = GetHeaderIndex(wlArray(0),bcHeader)
 
-If isNumeric(bcHeader) then
-   idxBC = bcHeader
-Else
-   ii=0
-   idxBC = -1
-   For Each header in Split(text,",")
-      If LCase(header) = LCase(bcHeader) Then
-         idxBC = ii
-         Exit For
-      End If
-      ii = ii + 1
-   Next
-End If
-
-' If idxBC<0, throw error
+' If idxBC not found, throw error
 If idxWell<0 Or idxBC<0 Then
    errMsg = "Error in vbScript Library, InsertBarcodesintoWorklist:" & vbCrLf
    errMsg = errMsg & "Could not find either " & wellHeader & " or " & bcHeader & " in the header," & vbCrLf 
@@ -1385,10 +1366,8 @@ For ii=1 To Ubound(wlArray)
    '  resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 Next
 If Len(errMsg)<=0 Then
-   If NOT (World.Globals.BrowserMan.Simulating) Then
-      CALL Write(text, worklist, vbFalse, vbTrue) 
-      InsertBarcodesIntoWorklist = vbTrue
-   End If
+   CALL Write(text, worklist, vbFalse, vbTrue) 
+   InsertBarcodesIntoWorklist = "success"
 Else
    InsertBarcodesIntoWorklist = errMsg
 End If
@@ -1400,44 +1379,43 @@ End Function
 '
 ' Take the incoming worklist file and replace the wells with
 ' the input well.  Useful when labware does not match up with
-' Exemplar worklist.
+' Exemplar worklist, i.e. troughs are only A1, but exemplar is treating it like 96-well
+' Added ability to use an array of wells, each well is used sequentially
+' Input newWellValue is either a well or an array of wells in alpha-numeric form
 '/////////////////////////////////////////////
 Function InsertWellsIntoWorklist(worklist, wellHeader, newWellValue)
 Dim resp, text, line, header, ii, vals, jj, v
 DIM idxWell,wlString, wlArray, well
-Dim errMsg
+Dim errMsg, newWellCtr, ele
 
 InsertWellsIntoWorklist = "success"
 
  ' DEBUG
- ' resp = "Configuring  " & worklist
- ' resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
-   resp =""
+  resp = "InsertWellsIntoWorklist.... Configuring  " & worklist & vbCrLf
+  resp = resp & "well header = " & wellHeader & vbCrLf
+  If IsArray(newWellValue) Then
+     For Each ele In newWellValue
+        resp = resp & "new well value = " & ele & vbCrLf
+     Next
+  else
+     resp = resp & "new well value = " & newWellValue & vbCrLf
+  End if
+'  Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+  resp =""
 
 wlString = Read(worklist)
+If InStr(LCase(wlString), "error")>0 Then
+   errMsg = "Error in vbScript Library, InsertWellsIntoWorklist reading worklist:" & vbCrLf & wlString
+   InsertWellsIntoWorklist = errMsg
+   Exit Function
+End If
 wlArray = Split(wlString, vbCrLf)
-
+   
 ' Grab the header
 text = wlArray(0)   ' vbCrLf added later...
 
-' Sort the header indices
-' assume for now that the headers are valid
-If isNumeric(wellHeader) then
-   idxWell = wellHeader
-Else
-   ii=0
-   idxWell = -1
-   For Each header in Split(text,",")
-      If LCase(header) = LCase(wellHeader) Then
-         idxWell = ii
-         Exit For
-      End If
-      ii = ii + 1
-   Next
-End If
-
-
-' If idxWell<0, throw error
+' Sort the header index, if idxWell<0, throw error
+idxWell = GetHeaderIndex(wlArray(0),wellHeader)
 If idxWell<0 Then
    errMsg = "Error in vbScript Library, InsertWellsIntoWorklist:" & vbCrLf
    errMsg = errMsg & "Could not find " & wellHeader & " in the header," & vbCrLf 
@@ -1447,10 +1425,10 @@ If idxWell<0 Then
 End If
 
 '  DEBUG
-   resp = "Worklist: " & worklist
-   resp = resp & "Well IDX; " & CStr(idxWell) & vbCrLf
- ''  resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+   resp = "Worklist: " & worklist & vbCrLf & "Well IDX = " & CStr(idxWell) & vbCrLf
+'   resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
+newWellCtr = 0
 For ii=1 To Ubound(wlArray)
    vals = Split(wlArray(ii),",")
 
@@ -1461,16 +1439,24 @@ For ii=1 To Ubound(wlArray)
       resp = resp & "Well " & vals(idxWell) & " = " & well & vbCrLf
    Else
       resp = resp & "Indices out of range, UBOUND(vals) = " & UBound(vals)
-      resp = resp & "Well idx " & CStr(idxWell) & vbCrLf
+      resp = resp & " but Well idx = " & CStr(idxWell) & vbCrLf
    End If
    resp = resp & wlArray(ii) & vbCrLf
    For Each v in vals
       resp = resp & "<> " & v & vbCrLf
    Next
-'''   resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+'''   Call World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
 
    If (Ubound(vals)>= idxWell) Then
-      vals(idxWell) = newWellValue
+      If IsArray(newWellValue) Then
+         vals(idxWell) = newWellValue(newWellCtr)        
+         newWellCtr = newWellCtr + 1
+         If newWellCtr>UBound(newWellValue) Then
+            newWellCtr = 0
+         End If
+      Else
+         vals(idxWell) = newWellValue
+      End If
       line = vals(0)
       For jj=1 To UBound(vals)
          line = line & "," & vals(jj)
@@ -1479,13 +1465,10 @@ For ii=1 To Ubound(wlArray)
    End If
    
    '  DEBUG
-      resp = "New Line: " & line
-   '  resp = World.Globals.PauseGenerator.BtnPromptUser(resp, Array("OK"), "OK")
+   '   Call World.Globals.PauseGenerator.BtnPromptUser("New Line: " & line, Array("OK"), "OK")
 Next
 If Len(errMsg)<=0 Then
-   If NOT (World.Globals.BrowserMan.Simulating) Then
-      CALL Write(text, worklist, vbFalse, vbTrue)       
-   End If
+   CALL Write(text, worklist, vbFalse, vbTrue)       
 Else
    InsertWellsIntoWorklist = errMsg
 End If
@@ -1525,7 +1508,8 @@ Set headerList = CreateObject("Othros.VariantList")
 exSrcBcHeader = "SourceRackBarcode"
 exDstBcHeader = "DestinationRackBarcode"
 exMidHeader = "LigationMIDTrayBarcode"   
-exTweenEbHeader = "TweenEBRack"
+' Skip for now until headers get worked out
+''exTweenEbHeader = "TweenEBRack"
 exBlockerHeader = "RackToPlateBlockerTrayBarcode"  
 exProbeHeader = "HybPrepProbePlateBarcode"                         
 
@@ -1602,6 +1586,79 @@ End Function
 
 '/////////////////////////////////////////////
 
+   
+'/////////////////////////////////////////////
+' Function InsertDataIntoWorklist(worklist,dataHeader,data)
+'
+' Take the incoming worklist and replace each cell in the dataHeader
+' column with the given data.
+' 
+' worklist: file including path of the worklist to be modified
+' dataHeader: index (string or number) of the data column
+' data: data to replace in each cell, if data is an array
+' indices are 0...n, n=number of lines-1 in worklist (skip the header)
+' if data is a single value, then all the cells are over-written with the value
+'
+'/////////////////////////////////////////////
+Function InsertDataIntoWorklist(worklist, dataHeader, data)
+DIM resp, headerIdx, headers
+DIM line, text, textArray, ii, jj, vals, newText
+                       
+On Error Resume Next
+InsertDataIntoWorklist = "success"
+resp = ""
+text = Read(worklist)
+'World.Globals.PauseGenerator.BtnPromptUser "InsertDataIntoWorklist...Read " & worklist & vbCrLf & text, Array("OK"), "OK"
+If InStr(LCase(text),"error")>0 Then
+   InsertDataIntoWorklist = "Error From InsertDataIntoWorklist" & vbCrLf & text
+   Exit Function
+Else
+   textArray = Split(text, vbCrLf)   
+End If
+
+' If header index not found, throw an error
+headerIdx = GetHeaderIndex(textArray(0),dataHeader) 
+If headerIdx<0 Or headerIdx>UBound(Split(textArray(0),",")) Then
+   errMsg = "Error in vbScript Library, InsertDataintoWorklist:" & vbCrLf
+   errMsg = errMsg & "Could not find matching header from input dataHeader=" & dataHeader & " in the header," & vbCrLf 
+   errMsg = errMsg & textArray(0) & vbCrLf & vbCrLf
+   errMsg = errMsg & "Either no match was found in the headers or the index of the header exceeded the number of columns." 
+   InsertDataIntoWorklist = errMsg
+   Exit Function
+End If      
+
+'Insert data into each cell and rebuild the text file
+newText = textArray(0)
+For ii=1 To Ubound(textArray) 
+   If Len(textArray(ii))<UBound(Split(textArray(0),",")) Then
+   Else
+      vals = Split(textArray(ii), ",")
+      If IsArray(data) Then
+         vals(headerIdx) = data(ii)
+      Else
+         vals(headerIdx) = data
+      End If      
+   End If
+    
+   ' Put the line back together
+   newText = newText & vbCrLf
+   For jj=0 To Ubound(vals)
+      If jj=0 Then
+         newText = newText & vals(jj)
+      Else
+         newText = newText & "," & vals(jj)
+      End If
+   Next
+Next
+Call Write(newText, worklist, vbFalse, vbTrue)
+If Err.Number <> 0 Then
+   InsertDataIntoWorklist = "Error in vbScript Library's InsertDataWorklist:" & vbCrLf & Err.Description
+   Err.Clear
+End If
+
+End Function   
+
+'/////////////////////////////////////////////
    
       
 '/////////////////////////////////////////////
@@ -1850,7 +1907,7 @@ Next
 If resp = vbTrue Then
    resp = "Writing " & g2FileName & vbCrLf
    resp = resp & g2text
- ''  World.Globals.PauseGenerator.BtnPromptUser resp, Array("OK"), "OK"
+ '  World.Globals.PauseGenerator.BtnPromptUser resp, Array("OK"), "OK"
    Call Write(g2Text, g2FileName, vbFalse, vbTrue)
    resp = vbTrue
 Else
